@@ -1,5 +1,10 @@
 # Remote Puppeteer Server
 
+## Requirements
+
+- pm2
+- node
+
 ## How to use
 
 1. Rename .env.example to .env
