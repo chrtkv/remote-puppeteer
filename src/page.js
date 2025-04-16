@@ -28,6 +28,7 @@ export async function navigatePage ({
   }
 
   const browser = await initializeBrowser();
+  const context = await browser.newContext();
   const page = await browser.newPage();
 
   try {
@@ -40,7 +41,7 @@ export async function navigatePage ({
     }
 
     if (cookies.length > 0) {
-      await page.setCookie(...cookies);
+      await context.setCookie(...cookies);
     }
 
     if (viewport) {
@@ -58,13 +59,17 @@ export async function navigatePage ({
     // Get page content (HTML)
     const content = await page.content();
 
+    const receivedCookies = await context.cookies();
+
     return {
       status: response.status(),
       url: response.url(),
+      cookies: receivedCookies,
       content,
     };
   } finally {
-    // Close page to prevent leaks
+    // Close page and context to prevent leaks
     await page.close();
+    await context.close();
   }
 }
