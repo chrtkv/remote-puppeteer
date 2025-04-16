@@ -28,8 +28,8 @@ export async function navigatePage ({
   }
 
   const browser = await initializeBrowser();
-  const context = await browser.newContext();
-  const page = await browser.newPage();
+  const context = browser.defaultBrowserContext();
+  const page = await context.newPage();
 
   try {
     if (userAgent) {
@@ -70,6 +70,5 @@ export async function navigatePage ({
   } finally {
     // Close page and context to prevent leaks
     await page.close();
-    await context.close();
   }
 }

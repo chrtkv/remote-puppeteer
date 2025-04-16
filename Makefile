@@ -7,7 +7,7 @@ start:
   --max-memory-restart="2G" && pm2 save
 
 restart:
-	pm2 restart puppeteer-server
+	pm2 restart puppeteer-server --update-env
 
 status:
 	pm2 status puppeteer-server
