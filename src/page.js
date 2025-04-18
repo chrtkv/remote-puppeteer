@@ -1,4 +1,5 @@
 import { initializeBrowser } from './browser.js';
+import logger from './logger.js';
 
 /**
  * Navigate a page with given parameters
@@ -26,6 +27,12 @@ export async function navigatePage ({
   if (!url) {
     throw new Error('URL is required');
   }
+
+  logger.info(`Navigating to URL: ${url}`, {
+    headers,
+    cookies,
+    userAgent,
+  });
 
   const browser = await initializeBrowser();
   const context = browser.defaultBrowserContext();
