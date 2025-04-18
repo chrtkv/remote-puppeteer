@@ -8,7 +8,7 @@ const logger = createLogger({
     new transports.File({
       filename: 'logs/error.log',
       level: 'error',
-    }), // Error logs
+    }),
     new transports.Console({ format: format.combine(format.colorize(), format.simple()) }),
   ],
 });

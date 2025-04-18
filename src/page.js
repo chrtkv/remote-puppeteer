@@ -28,11 +28,7 @@ export async function navigatePage ({
     throw new Error('URL is required');
   }
 
-  logger.info(`Navigating to URL: ${url}`, {
-    headers,
-    cookies,
-    userAgent,
-  });
+  logger.info(`Navigating to URL: ${url}`);
 
   const browser = await initializeBrowser();
   const context = browser.defaultBrowserContext();
