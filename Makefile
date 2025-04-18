@@ -12,7 +12,7 @@ restart:
 status:
 	pm2 status puppeteer-server
 
-logs:
+log:
 	pm2 logs puppeteer-server --lines 300
 
 monitor:
