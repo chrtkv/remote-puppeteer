@@ -1,6 +1,7 @@
 import express from 'express';
 import { navigatePage } from './page.js';
 import { closeBrowser } from './browser.js';
+import logger from './logger.js';
 import { config } from 'dotenv';
 
 // Load environment variables
@@ -47,5 +48,5 @@ app.post('/cleanup', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Puppeteer server running on port ${PORT}`);
+  logger.info(`Puppeteer server running on port ${PORT}`);
 });
