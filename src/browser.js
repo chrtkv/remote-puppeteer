@@ -1,12 +1,10 @@
 import puppeteer from 'puppeteer';
-import { Mutex } from 'async-mutex';
 import logger from './logger.js';
 
 let browser = null;
 let requestCount = 0;
 let isRestarting = false; // Flag to prevent concurrent restarts
 const MAX_REQUESTS = 40;
-const browserMutex = new Mutex();
 const CLOSE_TIMEOUT = 10000; // 10 seconds timeout for browser closure
 
 /**
@@ -15,7 +13,6 @@ const CLOSE_TIMEOUT = 10000; // 10 seconds timeout for browser closure
  * @returns {Promise<import('puppeteer').Browser>} - Browser instance
  */
 export async function initializeBrowser(options = {}) {
-  const release = await browserMutex.acquire();
   try {
     if (!browser) {
       logger.info('Launching new browser instance');
@@ -37,8 +34,6 @@ export async function initializeBrowser(options = {}) {
   } catch (error) {
     logger.error(`Failed to initialize browser: ${error.message}`);
     throw error;
-  } finally {
-    release();
   }
 }
 
@@ -47,7 +42,6 @@ export async function initializeBrowser(options = {}) {
  * @returns {Promise<void>}
  */
 export async function closeBrowser() {
-  const release = await browserMutex.acquire();
   try {
     if (browser) {
       logger.info('Closing browser instance');
@@ -98,8 +92,6 @@ export async function closeBrowser() {
     browser = null;
     requestCount = 0;
     isRestarting = false;
-  } finally {
-    release();
   }
 }
 
@@ -108,7 +100,6 @@ export async function closeBrowser() {
  * @returns {Promise<void>}
  */
 export async function incrementRequestCount() {
-  const release = await browserMutex.acquire();
   try {
     if (isRestarting) {
       logger.info('Waiting for browser restart to complete');
@@ -128,7 +119,5 @@ export async function incrementRequestCount() {
     logger.error(`Failed to increment request count: ${error.message}`);
     isRestarting = false;
     throw error;
-  } finally {
-    release();
   }
 }
