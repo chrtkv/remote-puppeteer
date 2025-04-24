@@ -60,7 +60,7 @@ export async function navigatePage({
     }
 
     if (cookies.length > 0) {
-      await context.setCookies(...cookies);
+      await context.setCookie(...cookies);
       logger.debug(`Set ${cookies.length} cookies for ${url}`);
     }
 
