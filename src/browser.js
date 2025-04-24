@@ -4,8 +4,10 @@ import logger from './logger.js';
 
 let browser = null;
 let requestCount = 0;
+let isRestarting = false; // Flag to prevent concurrent restarts
 const MAX_REQUESTS = 40;
 const browserMutex = new Mutex();
+const CLOSE_TIMEOUT = 10000; // 10 seconds timeout for browser closure
 
 /**
  * Initialize or reuse a Puppeteer browser instance
@@ -27,7 +29,8 @@ export async function initializeBrowser(options = {}) {
       browser.on('disconnected', () => {
         logger.warn('Browser disconnected, resetting instance');
         browser = null;
-        requestCount = 0; // Reset count on unexpected disconnect
+        requestCount = 0;
+        isRestarting = false;
       });
     }
     return browser;
@@ -40,7 +43,7 @@ export async function initializeBrowser(options = {}) {
 }
 
 /**
- * Close the browser instance
+ * Close the browser instance with a timeout
  * @returns {Promise<void>}
  */
 export async function closeBrowser() {
@@ -48,13 +51,53 @@ export async function closeBrowser() {
   try {
     if (browser) {
       logger.info('Closing browser instance');
-      await browser.close();
-      browser = null;
-      requestCount = 0; // Reset count on close
+
+      // Close all pages and contexts
+      const pages = await browser.pages();
+      logger.info(`Closing ${pages.length} open pages`);
+      await Promise.all(pages.map(async (page) => {
+        try {
+          await page.close();
+          logger.debug(`Closed page: ${page.url()}`);
+        } catch (error) {
+          logger.error(`Failed to close page: ${error.message}`);
+        }
+      }));
+
+      const contexts = browser.browserContexts();
+      logger.info(`Closing ${contexts.length - 1} additional browser contexts`);
+      await Promise.all(contexts.map(async (context, index) => {
+        if (index === 0) return; // Skip default context
+        try {
+          await context.close();
+          logger.debug('Closed browser context');
+        } catch (error) {
+          logger.error(`Failed to close browser context: ${error.message}`);
+        }
+      }));
+
+      // Close browser with timeout
+      const closePromise = browser.close();
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timed out')), CLOSE_TIMEOUT));
+      await Promise.race([closePromise, timeoutPromise]);
+      logger.info('Browser closed successfully');
     }
+    browser = null;
+    requestCount = 0;
+    isRestarting = false;
   } catch (error) {
     logger.error(`Failed to close browser: ${error.message}`);
-    throw error;
+    if (browser) {
+      try {
+        logger.warn('Forcing browser process termination');
+        browser.process().kill('SIGTERM');
+      } catch (killError) {
+        logger.error(`Failed to kill browser process: ${killError.message}`);
+      }
+    }
+    browser = null;
+    requestCount = 0;
+    isRestarting = false;
   } finally {
     release();
   }
@@ -67,15 +110,23 @@ export async function closeBrowser() {
 export async function incrementRequestCount() {
   const release = await browserMutex.acquire();
   try {
+    if (isRestarting) {
+      logger.info('Waiting for browser restart to complete');
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait and retry
+      return incrementRequestCount(); // Retry after delay
+    }
+
     requestCount++;
     logger.info(`Request count incremented to: ${requestCount}`);
     if (requestCount >= MAX_REQUESTS) {
-      logger.info('Max requests reached, restarting browser');
+      logger.info('Max requests reached, initiating browser restart');
+      isRestarting = true;
       await closeBrowser();
-      requestCount = 0; // Ensure count is reset after restart
+      logger.info('Browser restart completed');
     }
   } catch (error) {
     logger.error(`Failed to increment request count: ${error.message}`);
+    isRestarting = false;
     throw error;
   } finally {
     release();
