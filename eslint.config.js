@@ -16,7 +16,7 @@ export default [
         'error',
         {
           multiline: true,
-          minItems: 3,
+          minItems: 4,
         },
       ],
       '@stylistic/js/padded-blocks': ['error', 'never'],
@@ -33,6 +33,14 @@ export default [
       '@stylistic/js/object-curly-spacing': ['error', 'always'],
       '@stylistic/js/function-call-argument-newline': ['error', 'never'],
       '@stylistic/js/quote-props': ['error', 'as-needed'],
+      '@stylistic/js/space-before-function-paren': [
+        'error',
+        {
+          anonymous: 'always',
+          named: 'never',
+          asyncArrow: 'always',
+        },
+      ],
     },
   },
 ];
