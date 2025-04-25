@@ -1,11 +1,14 @@
 import puppeteer from 'puppeteer';
 import logger from './logger.js';
-import { getNextProxy, getCurrentProxy, resetProxyRotation } from './proxy.js';
+import { getNextProxy, getCurrentProxy } from './proxy.js';
+import { config } from 'dotenv';
+
+// Load environment variables
+config();
 
 let browser = null;
 let requestCount = 0;
 let isRestarting = false;
-const MAX_REQUESTS = 40;
 const CLOSE_TIMEOUT = 10000;
 
 /**
@@ -15,11 +18,11 @@ const CLOSE_TIMEOUT = 10000;
  */
 export async function initializeBrowser(options = {}) {
   try {
-    if (browser && getCurrentProxy()) {
-      return browser;
+    if (browser) {
+      return browser; // Reuse existing browser if already initialized
     }
 
-    // Close existing browser if switching proxies
+    // Close existing browser if any (redundant but for safety)
     if (browser) {
       await closeBrowser();
     }
@@ -45,7 +48,6 @@ export async function initializeBrowser(options = {}) {
       browser = null;
       requestCount = 0;
       isRestarting = false;
-      resetProxyRotation();
     });
 
     return browser;
@@ -103,7 +105,6 @@ export async function closeBrowser() {
     browser = null;
     requestCount = 0;
     isRestarting = false;
-    resetProxyRotation();
   } catch (error) {
     logger.error(`Failed to close browser: ${error.message}`);
     if (browser) {
@@ -117,7 +118,6 @@ export async function closeBrowser() {
     browser = null;
     requestCount = 0;
     isRestarting = false;
-    resetProxyRotation();
   }
 }
 
@@ -135,7 +135,7 @@ export async function incrementRequestCount() {
 
     requestCount++;
     logger.info(`Request count incremented to: ${requestCount}`);
-    if (requestCount >= MAX_REQUESTS) {
+    if (requestCount >= process.env.MAX_REQUESTS_BEFORE_RELOADING) {
       logger.info('Max requests reached, initiating browser restart with proxy rotation');
       isRestarting = true;
       await closeBrowser();

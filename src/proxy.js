@@ -37,7 +37,7 @@ function loadProxies() {
     ? process.env.PROXY_SERVERS.split(',').map((p) => p.trim())
     : [];
   if (proxyList.length === 0) {
-    logger.warn('No proxies defined in PROXY_LIST environment variable');
+    logger.warn('No proxies defined in PROXY_SERVERS environment variable');
     return [];
   }
   return proxyList.map(parseProxy);
@@ -50,6 +50,7 @@ function loadProxies() {
 export function getNextProxy() {
   const proxies = loadProxies();
   if (proxies.length === 0) {
+    currentProxy = null;
     return null;
   }
 
@@ -66,13 +67,4 @@ export function getNextProxy() {
  */
 export function getCurrentProxy() {
   return currentProxy;
-}
-
-/**
- * Reset proxy rotation to start
- */
-export function resetProxyRotation() {
-  currentProxyIndex = 0;
-  currentProxy = null;
-  logger.debug('Reset proxy rotation');
 }
