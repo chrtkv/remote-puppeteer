@@ -41,6 +41,7 @@ export default [
           asyncArrow: 'always',
         },
       ],
+      '@stylistic/js/multiline-ternary': ['error', 'ignore'],
     },
   },
 ];

@@ -1,5 +1,9 @@
-import { initializeBrowser, incrementRequestCount } from './browser.js';
+import { initializeBrowser, incrementRequestCount, getCurrentProxy } from './browser.js';
 import logger from './logger.js';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 /**
  * Navigate a page with given parameters
@@ -48,6 +52,16 @@ export async function navigatePage({
     context = browser.defaultBrowserContext();
     page = await context.newPage();
     logger.info(`New page created for ${url}`);
+
+    // Handle proxy authentication
+    const proxy = getCurrentProxy();
+    if (proxy && proxy.username && proxy.password) {
+      await page.authenticate({
+        username: proxy.username,
+        password: proxy.password,
+      });
+      logger.debug(`Set proxy authentication for ${url}: ${proxy.url}`);
+    }
 
     if (userAgent) {
       await page.setUserAgent(userAgent);
