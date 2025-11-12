@@ -47,6 +47,24 @@ app.post('/cleanup', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal) => {
+  logger.info(`Received ${signal}, initiating graceful shutdown...`);
+  try {
+    await closeBrowser();
+    logger.info('Browser cleanup completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error(`Error during shutdown cleanup: ${error.message}`);
+    process.exit(1);
+  }
+};
+
+// Handle shutdown signals
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
 app.listen(PORT, () => {
   logger.info(`Puppeteer server running on port ${PORT}`);
 });

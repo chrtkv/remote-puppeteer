@@ -22,11 +22,6 @@ export async function initializeBrowser(options = {}) {
       return browser; // Reuse existing browser if already initialized
     }
 
-    // Close existing browser if any (redundant but for safety)
-    if (browser) {
-      await closeBrowser();
-    }
-
     // Select the next proxy
     const proxy = getNextProxy();
     const proxyServer = proxy ? `${proxy.host}:${proxy.port}` : null;
@@ -139,6 +134,7 @@ export async function incrementRequestCount() {
       logger.info('Max requests reached, initiating browser restart with proxy rotation');
       isRestarting = true;
       await closeBrowser();
+      isRestarting = false; // Reset flag after successful restart
       logger.info('Browser restart completed');
     }
   } catch (error) {
