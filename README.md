@@ -15,7 +15,7 @@ Every route except `GET /healthz` needs the `x-api-key` header equal to `API_KEY
 | `headers`, `cookies`, `userAgent`, `viewport` | — | Applied to the page before navigation |
 | `waitUntil`, `timeout` | `networkidle2`, `30000` | Passed to `page.goto` |
 | `pageOptions` | `{}` | `cacheEnabled`, `navigation` (extra `page.goto` options) |
-| `blockResources` | `["image", "stylesheet", "font"]` | Resource types to abort. `[]` loads everything; blocking can keep elements from becoming visible |
+| `blockResources` | `["image", "stylesheet", "font"]` | Resource types to abort. `[]` loads everything. Blocking can keep elements from becoming visible and lazy content from loading at all: without stylesheets the PS Store grid never requests `categoryGridRetrieve` |
 | `returnContent` | `true` | `false` leaves the HTML out of the response |
 | `capture` | — | `{ "urlIncludes": "substring" or [...], "methods": ["GET"] }`: record matching requests (`OPTIONS` never) |
 | `actions` | `[]` | Steps run in order after navigation, see below |
@@ -40,6 +40,7 @@ Example: catch the GraphQL request a store page makes, without its HTML.
 {
   "url": "https://store.playstation.com/ru-ua/pages/browse/1",
   "returnContent": false,
+  "blockResources": [],
   "capture": { "urlIncludes": "categoryGridRetrieve", "methods": ["GET"] }
 }
 ```
@@ -66,6 +67,9 @@ Closes the browser; the next request starts a new one.
 
 ## Running
 
+TypeScript, run as is by Node 24's type stripping: no build step, so only erasable syntax (no enums, namespaces or
+parameter properties). `npm run typecheck` and `npm run lint` check it.
+
 Docker (Debian's Chromium, logs to the console):
 
 ```bash
@@ -73,4 +77,5 @@ docker build -t remote-puppeteer .
 docker run -d --init --shm-size=512m -e API_KEY=... -p 127.0.0.1:3000:3000 remote-puppeteer
 ```
 
-pm2: copy `.env.example` to `.env`, set `API_KEY`, then `make start`.
+pm2 (Node 24+): copy `.env.example` to `.env`, set `API_KEY` and `CHROMIUM_PATH`, then `make start`. npm 11 skips
+puppeteer's install script, so there is no downloaded browser to fall back on.

@@ -1,29 +1,49 @@
-import { acquireBrowser, releaseBrowser, getCurrentProxy } from './browser.js';
-import { runActions, urlMatches, validateActions } from './actions.js';
-import logger from './logger.js';
+import type { BrowserContext, CookieData, GoToOptions, Page, ResourceType, Viewport } from 'puppeteer';
+import { acquireBrowser, releaseBrowser, getCurrentProxy } from './browser.ts';
+import { runActions, urlMatches, validateActions, type Action, type ActionReport, type UrlPattern } from './actions.ts';
+import logger from './logger.ts';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
 
-const DEFAULT_BLOCKED_RESOURCES = ['image', 'stylesheet', 'font'];
+const DEFAULT_BLOCKED_RESOURCES: ResourceType[] = ['image', 'stylesheet', 'font'];
+
+export interface CaptureOptions {
+  urlIncludes: UrlPattern;
+  methods?: string[];
+}
+
+export interface NavigateParams {
+  url?: string;
+  headers?: Record<string, string>;
+  cookies?: CookieData[];
+  userAgent?: string;
+  viewport?: Viewport;
+  waitUntil?: GoToOptions['waitUntil'];
+  timeout?: number;
+  pageOptions?: { cacheEnabled?: boolean;
+    navigation?: GoToOptions; };
+  actions?: Action[];
+  capture?: CaptureOptions;
+  blockResources?: ResourceType[];
+  returnContent?: boolean;
+}
+
+export interface CapturedRequest {
+  url: string;
+  method: string;
+  resourceType: ResourceType;
+  postData: string | null;
+
+  /** -1 while the page loads, then the index of the action that was running */
+  step: number;
+  timestamp: number;
+}
 
 /**
  * Navigate a page with given parameters
- * @param {Object} params - Navigation parameters
- * @param {string} params.url - URL to navigate to
- * @param {Object} [params.headers] - HTTP headers
- * @param {Array<Object>} [params.cookies] - Cookies (e.g., [{ name, value, domain, path }])
- * @param {string} [params.userAgent] - Custom user agent
- * @param {Object} [params.viewport] - Viewport settings (e.g., { width, height })
- * @param {string} [params.waitUntil] - Navigation wait condition (e.g., 'networkidle2')
- * @param {number} [params.timeout] - Navigation timeout in ms
- * @param {Object} [params.pageOptions] - Additional Puppeteer page options
- * @param {Array<Object>} [params.actions] - Steps after navigation, see actions.js
- * @param {Object} [params.capture] - Record requests: { urlIncludes, methods }
- * @param {Array<string>} [params.blockResources] - Resource types to abort
- * @param {boolean} [params.returnContent] - Return the page HTML
- * @returns {Promise<Object>} - Response data: { status, url, cookies, content, requests, actions }
+ * @returns Response data: { status, url, cookies, content, requests, actions }
  */
 export async function navigatePage({
   url,
@@ -38,7 +58,7 @@ export async function navigatePage({
   capture,
   blockResources = DEFAULT_BLOCKED_RESOURCES,
   returnContent = true,
-} = {}) {
+}: NavigateParams = {}) {
   if (!url) {
     logger.error('URL is required');
     throw new Error('URL is required');
@@ -50,8 +70,8 @@ export async function navigatePage({
   const browser = await acquireBrowser();
   logger.info(`Browser initialized for ${url}`);
 
-  let context;
-  let page;
+  let context: BrowserContext;
+  let page: Page | undefined;
   try {
     context = browser.defaultBrowserContext();
     page = await context.newPage();
@@ -89,9 +109,8 @@ export async function navigatePage({
 
     await page.setCacheEnabled(pageOptions.cacheEnabled ?? true);
 
-    // -1 while the page loads, then the index of the action that was running when a request went out
     let step = -1;
-    const requests = [];
+    const requests: CapturedRequest[] = [];
     if (capture?.urlIncludes) {
       const methods = capture.methods?.map((method) => method.toUpperCase());
       page.on('request', (request) => {
@@ -129,8 +148,11 @@ export async function navigatePage({
       timeout,
       ...pageOptions.navigation,
     });
+    if (!response) {
+      throw new Error(`No response for ${url}`);
+    }
 
-    const actionReport = await runActions(page, actions, (index) => {
+    const actionReport: ActionReport[] = await runActions(page, actions, (index) => {
       step = index;
     });
 
@@ -150,7 +172,7 @@ export async function navigatePage({
       ...actions.length > 0 ? { actions: actionReport } : {},
     };
   } catch (error) {
-    logger.error(`Navigation failed for ${url}: ${error.message}`);
+    logger.error(`Navigation failed for ${url}: ${(error as Error).message}`);
     throw error;
   } finally {
     // Close page to prevent leaks
@@ -159,7 +181,7 @@ export async function navigatePage({
         await page.close();
         logger.info(`Closed page for ${url}`);
       } catch (error) {
-        logger.error(`Failed to close page for ${url}: ${error.message}`);
+        logger.error(`Failed to close page for ${url}: ${(error as Error).message}`);
       }
     }
     await releaseBrowser();

@@ -1,8 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
-import express from 'express';
-import { navigatePage } from './page.js';
-import { closeBrowser } from './browser.js';
-import logger from './logger.js';
+import express, { type RequestHandler } from 'express';
+import { navigatePage } from './page.ts';
+import { ActionError } from './actions.ts';
+import { closeBrowser } from './browser.ts';
+import logger from './logger.ts';
 import { config } from 'dotenv';
 
 // Load environment variables
@@ -24,10 +25,11 @@ app.get('/healthz', (req, res) => {
   res.json({ ok: true });
 });
 
-const requireApiKey = (req, res, next) => {
-  const apiKey = Buffer.from(req.headers['x-api-key'] ?? '');
+const requireApiKey: RequestHandler = (req, res, next) => {
+  const apiKey = Buffer.from(req.get('x-api-key') ?? '');
   if (apiKey.length !== expectedKey.length || !timingSafeEqual(apiKey, expectedKey)) {
-    return res.status(401).json({ error: 'Invalid or missing API key' });
+    res.status(401).json({ error: 'Invalid or missing API key' });
+    return;
   }
   next();
 };
@@ -36,8 +38,7 @@ app.use(requireApiKey);
 
 /**
  * POST /navigate - Navigate to a URL with given parameters
- * Body: { url, headers, cookies, userAgent, viewport, waitUntil, timeout, pageOptions, actions, capture,
- *   blockResources, returnContent }
+ * Body: NavigateParams (page.ts)
  */
 app.post('/navigate', async (req, res) => {
   try {
@@ -45,8 +46,10 @@ app.post('/navigate', async (req, res) => {
     const result = await navigatePage(params);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message,
-      ...error.actions ? { actions: error.actions } : {} });
+    res.status(500).json({
+      error: (error as Error).message,
+      ...error instanceof ActionError ? { actions: error.actions } : {},
+    });
   }
 });
 
@@ -58,21 +61,21 @@ app.post('/cleanup', async (req, res) => {
     await closeBrowser();
     res.json({ message: 'Browser closed or already closed' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: (error as Error).message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 
 // Graceful shutdown handling
-const gracefulShutdown = async (signal) => {
+const gracefulShutdown = async (signal: NodeJS.Signals) => {
   logger.info(`Received ${signal}, initiating graceful shutdown...`);
   try {
     await closeBrowser();
     logger.info('Browser cleanup completed');
     process.exit(0);
   } catch (error) {
-    logger.error(`Error during shutdown cleanup: ${error.message}`);
+    logger.error(`Error during shutdown cleanup: ${(error as Error).message}`);
     process.exit(1);
   }
 };

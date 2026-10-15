@@ -1,27 +1,26 @@
-import puppeteer from 'puppeteer';
-import logger from './logger.js';
-import { getNextProxy, getCurrentProxy } from './proxy.js';
+import puppeteer, { type Browser, type LaunchOptions } from 'puppeteer';
+import logger from './logger.ts';
+import { getNextProxy, getCurrentProxy } from './proxy.ts';
 import { config } from 'dotenv';
 
 // Load environment variables
 config();
 
-let browser = null;
-let launching = null;
+let browser: Browser | null = null;
+let launching: Promise<Browser> | null = null;
 let requestCount = 0;
 let inFlight = 0;
 let restartPending = false;
 const CLOSE_TIMEOUT = 10000;
-const MAX_REQUESTS_BEFORE_RELOADING = Number.parseInt(process.env.MAX_REQUESTS_BEFORE_RELOADING, 10) || 0;
+const MAX_REQUESTS_BEFORE_RELOADING = Number.parseInt(process.env.MAX_REQUESTS_BEFORE_RELOADING ?? '', 10) || 0;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Initialize or reuse a Puppeteer browser instance
- * @param {Object} [options] - Browser launch options
- * @returns {Promise<import('puppeteer').Browser>} - Browser instance
+ * @param options - Browser launch options
  */
-export async function initializeBrowser(options = {}) {
+export async function initializeBrowser(options: LaunchOptions = {}): Promise<Browser> {
   try {
     if (browser) {
       return browser; // Reuse existing browser if already initialized
@@ -32,22 +31,21 @@ export async function initializeBrowser(options = {}) {
     });
     return await launching;
   } catch (error) {
-    logger.error(`Failed to initialize browser: ${error.message}`);
+    logger.error(`Failed to initialize browser: ${(error as Error).message}`);
     throw error;
   }
 }
 
 /**
  * Launch a browser with the next proxy in the rotation
- * @param {Object} [options] - Browser launch options
- * @returns {Promise<import('puppeteer').Browser>} - Browser instance
+ * @param options - Browser launch options
  */
-async function launchBrowser(options) {
+async function launchBrowser(options: LaunchOptions): Promise<Browser> {
   // Select the next proxy
   const proxy = getNextProxy();
   const proxyServer = proxy ? `${proxy.host}:${proxy.port}` : null;
 
-  logger.info(`Launching new browser instance ${proxyServer ? `with proxy ${proxy.url}` : 'without proxy'}`);
+  logger.info(`Launching new browser instance ${proxy ? `with proxy ${proxy.url}` : 'without proxy'}`);
   const launched = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', ...proxyServer ? [`--proxy-server=${proxyServer}`] : []],
@@ -70,9 +68,8 @@ async function launchBrowser(options) {
 
 /**
  * Close the browser instance with a timeout
- * @returns {Promise<void>}
  */
-export async function closeBrowser() {
+export async function closeBrowser(): Promise<void> {
   try {
     if (browser) {
       logger.info('Closing browser instance');
@@ -85,7 +82,7 @@ export async function closeBrowser() {
           await page.close();
           logger.debug(`Closed page: ${page.url()}`);
         } catch (error) {
-          logger.error(`Failed to close page: ${error.message}`);
+          logger.error(`Failed to close page: ${(error as Error).message}`);
         }
       }));
 
@@ -97,7 +94,7 @@ export async function closeBrowser() {
           await context.close();
           logger.debug('Closed browser context');
         } catch (error) {
-          logger.error(`Failed to close browser context: ${error.message}`);
+          logger.error(`Failed to close browser context: ${(error as Error).message}`);
         }
       }));
 
@@ -110,13 +107,13 @@ export async function closeBrowser() {
     browser = null;
     requestCount = 0;
   } catch (error) {
-    logger.error(`Failed to close browser: ${error.message}`);
+    logger.error(`Failed to close browser: ${(error as Error).message}`);
     if (browser) {
       try {
         logger.warn('Forcing browser process termination');
-        browser.process().kill('SIGTERM');
+        browser.process()?.kill('SIGTERM');
       } catch (killError) {
-        logger.error(`Failed to kill browser process: ${killError.message}`);
+        logger.error(`Failed to kill browser process: ${(killError as Error).message}`);
       }
     }
     browser = null;
@@ -127,9 +124,8 @@ export async function closeBrowser() {
 /**
  * Take the browser for one request. Waits while a restart is pending, so a restart never closes the browser under
  * a running request.
- * @returns {Promise<import('puppeteer').Browser>} - Browser instance
  */
-export async function acquireBrowser() {
+export async function acquireBrowser(): Promise<Browser> {
   while (restartPending) {
     await sleep(200);
   }
@@ -147,9 +143,8 @@ export async function acquireBrowser() {
 
 /**
  * Give the browser back after a request; restart it once the request limit is reached and nothing is running
- * @returns {Promise<void>}
  */
-export async function releaseBrowser() {
+export async function releaseBrowser(): Promise<void> {
   inFlight--;
 
   if (MAX_REQUESTS_BEFORE_RELOADING && requestCount >= MAX_REQUESTS_BEFORE_RELOADING && !restartPending) {
@@ -165,7 +160,6 @@ export async function releaseBrowser() {
 }
 
 /**
- * Get the current proxy (exported for page.js)
- * @returns {Object|null} - Current proxy details
+ * Get the current proxy (exported for page.ts)
  */
 export { getCurrentProxy };

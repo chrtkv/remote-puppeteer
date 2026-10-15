@@ -2,7 +2,7 @@ export default {
   apps: [
     {
       name: 'puppeteer-server',
-      script: 'src/server.js', // Try without the ./
+      script: 'src/server.ts',
       instances: 1,
       autorestart: true,
       watch: false,

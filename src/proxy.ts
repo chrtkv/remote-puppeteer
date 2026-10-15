@@ -1,18 +1,25 @@
-import logger from './logger.js';
+import logger from './logger.ts';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
 
+export interface Proxy {
+  url: string;
+  host: string;
+  port: string;
+  username: string | null;
+  password: string | null;
+}
+
 let currentProxyIndex = 0; // Track current proxy
-let currentProxy = null; // Store current proxy details
+let currentProxy: Proxy | null = null; // Store current proxy details
 
 /**
  * Parse proxy URL into components
- * @param {string} proxyUrl - Proxy URL (e.g., http://user:pass@host:port)
- * @returns {Object} - Proxy details: { url, host, port, username, password }
+ * @param proxyUrl - Proxy URL (e.g., http://user:pass@host:port)
  */
-function parseProxy(proxyUrl) {
+function parseProxy(proxyUrl: string): Proxy {
   try {
     const url = new URL(proxyUrl);
     return {
@@ -23,16 +30,15 @@ function parseProxy(proxyUrl) {
       password: url.password || null,
     };
   } catch (error) {
-    logger.error(`Failed to parse proxy URL ${proxyUrl}: ${error.message}`);
+    logger.error(`Failed to parse proxy URL ${proxyUrl}: ${(error as Error).message}`);
     throw error;
   }
 }
 
 /**
  * Load and parse proxies from environment variable
- * @returns {Array<Object>} - List of proxy objects
  */
-function loadProxies() {
+function loadProxies(): Proxy[] {
   const proxyList = process.env.PROXY_SERVERS
     ? process.env.PROXY_SERVERS.split(',').map((p) => p.trim())
     : [];
@@ -44,10 +50,9 @@ function loadProxies() {
 }
 
 /**
- * Get the next proxy in the rotation
- * @returns {Object|null} - Proxy details or null if no proxies
+ * Get the next proxy in the rotation, or null if no proxies
  */
-export function getNextProxy() {
+export function getNextProxy(): Proxy | null {
   const proxies = loadProxies();
   if (proxies.length === 0) {
     currentProxy = null;
@@ -63,8 +68,7 @@ export function getNextProxy() {
 
 /**
  * Get the current proxy
- * @returns {Object|null} - Current proxy details
  */
-export function getCurrentProxy() {
+export function getCurrentProxy(): Proxy | null {
   return currentProxy;
 }

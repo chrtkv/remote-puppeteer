@@ -1,26 +1,31 @@
-import stylisticJs from '@stylistic/eslint-plugin-js';
+import stylistic from '@stylistic/eslint-plugin';
+import tseslint from 'typescript-eslint';
 
 export default [
-  stylisticJs.configs.all,
+  ...tseslint.configs.recommended,
+  stylistic.configs.all,
   {
-    files: ['**/*.js'],
+    files: ['**/*.ts', '**/*.js'],
+  },
+  {
+    ignores: ['node_modules'],
   },
   {
     plugins: {
-      '@stylistic/js': stylisticJs,
+      '@stylistic': stylistic,
     },
     rules: {
-      '@stylistic/js/indent': ['error', 2],
-      '@stylistic/js/quotes': ['error', 'single'],
-      '@stylistic/js/array-element-newline': [
+      '@stylistic/indent': ['error', 2],
+      '@stylistic/quotes': ['error', 'single'],
+      '@stylistic/array-element-newline': [
         'error',
         {
           multiline: true,
           minItems: 4,
         },
       ],
-      '@stylistic/js/padded-blocks': ['error', 'never'],
-      '@stylistic/js/comma-dangle': [
+      '@stylistic/padded-blocks': ['error', 'never'],
+      '@stylistic/comma-dangle': [
         'error',
         {
           arrays: 'always-multiline',
@@ -30,10 +35,10 @@ export default [
           functions: 'always-multiline',
         },
       ],
-      '@stylistic/js/object-curly-spacing': ['error', 'always'],
-      '@stylistic/js/function-call-argument-newline': ['error', 'never'],
-      '@stylistic/js/quote-props': ['error', 'as-needed'],
-      '@stylistic/js/space-before-function-paren': [
+      '@stylistic/object-curly-spacing': ['error', 'always'],
+      '@stylistic/function-call-argument-newline': ['error', 'never'],
+      '@stylistic/quote-props': ['error', 'as-needed'],
+      '@stylistic/space-before-function-paren': [
         'error',
         {
           anonymous: 'always',
@@ -41,7 +46,7 @@ export default [
           asyncArrow: 'always',
         },
       ],
-      '@stylistic/js/multiline-ternary': 'off',
+      '@stylistic/multiline-ternary': 'off',
     },
   },
 ];

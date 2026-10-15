@@ -1,8 +1,8 @@
 lint:
-	npx eslint .
+	npx eslint . && npx tsc
 
 start:
-	pm2 start src/server.js \
+	pm2 start src/server.ts \
   --name "puppeteer-server" \
   --max-memory-restart="2G" && pm2 save
 
