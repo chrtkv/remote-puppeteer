@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import { navigatePage } from './page.js';
 import { closeBrowser } from './browser.js';
@@ -7,12 +8,25 @@ import { config } from 'dotenv';
 // Load environment variables
 config();
 
+if (!process.env.API_KEY) {
+  logger.error('API_KEY is not set, refusing to start');
+  process.exit(1);
+}
+const expectedKey = Buffer.from(process.env.API_KEY);
+
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
+
+/**
+ * GET /healthz - Liveness for Docker and monitoring; the only route without the API key
+ */
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true });
+});
 
 const requireApiKey = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  if (!apiKey || apiKey !== process.env.API_KEY) {
+  const apiKey = Buffer.from(req.headers['x-api-key'] ?? '');
+  if (apiKey.length !== expectedKey.length || !timingSafeEqual(apiKey, expectedKey)) {
     return res.status(401).json({ error: 'Invalid or missing API key' });
   }
   next();
@@ -22,7 +36,8 @@ app.use(requireApiKey);
 
 /**
  * POST /navigate - Navigate to a URL with given parameters
- * Body: { url, headers, cookies, userAgent, viewport, waitUntil, timeout, pageOptions }
+ * Body: { url, headers, cookies, userAgent, viewport, waitUntil, timeout, pageOptions, actions, capture,
+ *   blockResources, returnContent }
  */
 app.post('/navigate', async (req, res) => {
   try {
@@ -30,7 +45,8 @@ app.post('/navigate', async (req, res) => {
     const result = await navigatePage(params);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message,
+      ...error.actions ? { actions: error.actions } : {} });
   }
 });
 

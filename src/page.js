@@ -1,9 +1,12 @@
-import { initializeBrowser, incrementRequestCount, getCurrentProxy } from './browser.js';
+import { acquireBrowser, releaseBrowser, getCurrentProxy } from './browser.js';
+import { runActions, urlMatches, validateActions } from './actions.js';
 import logger from './logger.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
+
+const DEFAULT_BLOCKED_RESOURCES = ['image', 'stylesheet', 'font'];
 
 /**
  * Navigate a page with given parameters
@@ -16,7 +19,11 @@ dotenv.config();
  * @param {string} [params.waitUntil] - Navigation wait condition (e.g., 'networkidle2')
  * @param {number} [params.timeout] - Navigation timeout in ms
  * @param {Object} [params.pageOptions] - Additional Puppeteer page options
- * @returns {Promise<Object>} - Response data: { status, url, content }
+ * @param {Array<Object>} [params.actions] - Steps after navigation, see actions.js
+ * @param {Object} [params.capture] - Record requests: { urlIncludes, methods }
+ * @param {Array<string>} [params.blockResources] - Resource types to abort
+ * @param {boolean} [params.returnContent] - Return the page HTML
+ * @returns {Promise<Object>} - Response data: { status, url, cookies, content, requests, actions }
  */
 export async function navigatePage({
   url,
@@ -27,28 +34,25 @@ export async function navigatePage({
   waitUntil = 'networkidle2',
   timeout = 30000,
   pageOptions = {},
+  actions = [],
+  capture,
+  blockResources = DEFAULT_BLOCKED_RESOURCES,
+  returnContent = true,
 } = {}) {
   if (!url) {
     logger.error('URL is required');
     throw new Error('URL is required');
   }
+  validateActions(actions);
 
   logger.info(`Navigating to URL: ${url}`);
 
-  // Increment request count and check if browser needs restart
-  try {
-    await incrementRequestCount();
-  } catch (error) {
-    logger.error(`Failed to increment request count for ${url}: ${error.message}`);
-    throw error;
-  }
+  const browser = await acquireBrowser();
+  logger.info(`Browser initialized for ${url}`);
 
-  let browser;
   let context;
   let page;
   try {
-    browser = await initializeBrowser();
-    logger.info(`Browser initialized for ${url}`);
     context = browser.defaultBrowserContext();
     page = await context.newPage();
     logger.info(`New page created for ${url}`);
@@ -85,14 +89,39 @@ export async function navigatePage({
 
     await page.setCacheEnabled(pageOptions.cacheEnabled ?? true);
 
-    await page.setRequestInterception(true);
-    page.on('request', (request) => {
-      if (['image', 'stylesheet', 'font'].includes(request.resourceType())) {
-        request.abort();
-      } else {
-        request.continue();
-      }
-    });
+    // -1 while the page loads, then the index of the action that was running when a request went out
+    let step = -1;
+    const requests = [];
+    if (capture?.urlIncludes) {
+      const methods = capture.methods?.map((method) => method.toUpperCase());
+      page.on('request', (request) => {
+        const method = request.method();
+        if (method === 'OPTIONS' || methods && !methods.includes(method)) {
+          return;
+        }
+        if (urlMatches(request.url(), capture.urlIncludes)) {
+          requests.push({
+            url: request.url(),
+            method,
+            resourceType: request.resourceType(),
+            postData: request.postData() ?? null,
+            step,
+            timestamp: Date.now(),
+          });
+        }
+      });
+    }
+
+    if (blockResources.length > 0) {
+      await page.setRequestInterception(true);
+      page.on('request', (request) => {
+        if (blockResources.includes(request.resourceType())) {
+          request.abort();
+        } else {
+          request.continue();
+        }
+      });
+    }
 
     logger.info(`Navigating to ${url} with waitUntil: ${waitUntil}, timeout: ${timeout}`);
     const response = await page.goto(url, {
@@ -101,8 +130,12 @@ export async function navigatePage({
       ...pageOptions.navigation,
     });
 
+    const actionReport = await runActions(page, actions, (index) => {
+      step = index;
+    });
+
     // Get page content (HTML)
-    const content = await page.content();
+    const content = returnContent ? await page.content() : undefined;
     logger.info(`Retrieved content for ${url}`);
 
     const receivedCookies = await context.cookies();
@@ -113,6 +146,8 @@ export async function navigatePage({
       url: response.url(),
       cookies: receivedCookies,
       content,
+      ...capture?.urlIncludes ? { requests } : {},
+      ...actions.length > 0 ? { actions: actionReport } : {},
     };
   } catch (error) {
     logger.error(`Navigation failed for ${url}: ${error.message}`);
@@ -127,5 +162,6 @@ export async function navigatePage({
         logger.error(`Failed to close page for ${url}: ${error.message}`);
       }
     }
+    await releaseBrowser();
   }
 }
