@@ -2,9 +2,7 @@ lint:
 	npx eslint . && npx tsc
 
 start:
-	pm2 start src/server.ts \
-  --name "puppeteer-server" \
-  --max-memory-restart="2G" && pm2 save
+	pm2 start ecosystem.config.cjs && pm2 save
 
 restart:
 	pm2 restart puppeteer-server --update-env
