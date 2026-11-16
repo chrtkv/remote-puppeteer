@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim
+FROM node:26-bookworm-slim
 
 # Debian mirror for apt. From Russia, a long download from deb.debian.org (Fastly) can slow to tens of KB/s, and then
 # Chromium alone takes most of an hour; n8n-deploy builds with http://mirror.yandex.ru.
